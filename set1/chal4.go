@@ -55,9 +55,11 @@ func main() {
 	scanner := bufio.NewScanner(file)
 	master_score := 0
 	var master_res string
+	line := -1
 	for scanner.Scan() {
 //		fmt.Println(scanner.Text())
 
+		line++
 		dec, _ := hex.DecodeString(scanner.Text())
 		sc, res := xor(string(dec))
 
@@ -65,9 +67,11 @@ func main() {
 			master_score = sc
 			master_res = res
 		}
+
 	}
 
 	fmt.Println("Winner winner (", master_score, ") => ", master_res)
+	fmt.Println("Line: ", line)
 
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
