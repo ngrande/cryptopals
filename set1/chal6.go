@@ -44,7 +44,7 @@ func detect_key_size(text string, min int, max int) int {
 
 func is_valid_char(in byte) bool {
 	lower := strings.ToLower(string(in))
-	if strings.Contains("abcdefghijklmnopqrstuvwxyz\"\n&()!=?", lower) {
+	if strings.Contains("abcdefghijklmnopqrstuvwxyz\"\n&()!=? ", lower) {
 		return true
 	}
 
@@ -84,11 +84,28 @@ func crypt(text string, key string) string {
 	return result
 }
 
-func score_text(text string, key string) int {
+func score(in string) int {
+	sc := 0
+
+	common_chars := "zqxjkvbpygfwmucldrhsnioate"
+
+	for _, char := range in {
+		
+		for worth, comm := range common_chars {
+			if char == comm || byte(char) == byte(comm) - 22 {
+				sc += worth
+			}
+		}
+	}
+
+	return sc
+}
+
+func score_text(text string, key string) (int, string) {
 	decrypted := crypt(text, key)
 
-	fmt.Println(decrypted)
-	return 0
+	sc := score(decrypted)
+	return sc, decrypted
 }
 
 func search_key_candidates(text string, key_size int) []string {
@@ -102,7 +119,11 @@ func search_key_candidates(text string, key_size int) []string {
 			if possible == false {
 				continue
 			} else {
-				key_cand[i] += string(byte(char))
+				// only add if is a valid char
+				// we expect the key to be "readable"
+				if is_valid_char(byte(char)) {
+					key_cand[i] += string(byte(char))
+				}
 			}
 		}
 	}
@@ -110,12 +131,66 @@ func search_key_candidates(text string, key_size int) []string {
 	return key_cand
 }
 
+func comb(in []string) string {
+
+	results := ""
+	for j := 0; j < len(in[0]); j++ {
+		tmp := string(in[0][j]) 
+			
+		if len(in[1:]) > 0 {
+			tmp += comb(in[1:])
+		}
+
+		results += tmp + " "
+	}
+
+	return results
+}
+
+func generate(data []string) []string {
+	in := comb(data)
+
+	split := strings.Split(in, " ")
+
+//	fmt.Println(split)
+
+	//is_group := false
+	group_len := len(split[0])
+//	fmt.Println(len(split[0]))
+	group := split[0]
+	result := ""
+	for i := 0; i < len(split); i++ {
+		if strings.Contains(split[i], " ") || len(split[i]) == 0 {
+			continue
+		}
+//		fmt.Println("Split: ", split[i])
+		if len(split[i]) == group_len {
+			group = split[i]
+			fmt.Println(group)
+			result += group + " "
+			continue
+		}
+		
+		ngroup_len := len(split[i])
+		group = group[0:group_len - ngroup_len] + split[i] 
+//		fmt.Println("Next: ", group)
+
+		result += group + " "
+
+	}
+
+	result = result[:len(result) - 1]
+
+	return strings.Split(result, " ")
+}
+
 func crack_key(text string, key_size int) string {
 	var key string
-	//best_score := 0
 
 	key_cand := search_key_candidates(text, key_size)
-	fmt.Println("Candidates: ", key_cand)
+	for cand := range key_cand {
+		fmt.Printf("Candidates #%d: %s\n", cand, key_cand[cand])
+	}
 	// key_cand looks like:
 	// "HELLO"
 	// "YOU"
@@ -127,24 +202,28 @@ func crack_key(text string, key_size int) string {
 	// "ABC"
 
 	// 
+	//key_cand = make([]string, 3)
+	//key_cand[0] = "ABl"
+	//key_cand[1] = "oX"
+	//key_cand[2] = "ol"
 
+	keys_arr := generate(key_cand)
 
-	//var possible_key string
+	fmt.Printf("Possible keys (%d): %s\n", len(keys_arr), keys_arr)
 
-	possibilities := 1
-	for i := 0; i < key_size; i++ {
-		possibilities *= len(key_cand[i])
-	}
+	high_score := 0
+	high_score_text := ""
+	for i := 0; i < len(keys_arr); i++ {
+		pos_key := keys_arr[i]
 
-	keys_arr := make([]string, possibilities)
-	for i := 0; i < key_size; i++ {
-		for char_ind := 0; char_ind < len(key_cand[i]); char_ind++ {
-			keys_arr[i + char_ind] += string(key_cand[i][char_ind])
+		sc, decr := score_text(text, pos_key)
+		if sc > high_score {
+			high_score = sc
+			high_score_text = decr
+			key = pos_key
+			fmt.Printf("Key: %s Score: %d => %s\n", pos_key, high_score, high_score_text)
 		}
 	}
-
-
-	fmt.Println("Possible keys: ", keys_arr)
 
 	return key
 }
@@ -192,8 +271,10 @@ func main() {
 
 	fmt.Println("Keysize detected: ", key_size)
 
-	crack_key(decoded, key_size)
+//	crack_key(decoded, key_size)
 
 
-	crack_key(encrypted_test, 3)
+	key := crack_key(encrypted_test, 3)
+
+	fmt.Println("Found key: ", key)
 }
