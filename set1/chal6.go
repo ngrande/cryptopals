@@ -6,8 +6,11 @@ import "os"
 import "bufio"
 import b64 "encoding/base64"
 import "strings"
+import "regexp"
 
 var key_gen_sep byte = 1
+var common_english_words []string 
+var english_word_regex *regexp.Regexp
 
 func calc_diff(left string, right string) int {
 	diff := 0
@@ -118,30 +121,41 @@ func crypt(text string, key string) string {
 func score(in string) int {
 	sc := 0
 
-	common_chars := "!,zqxjkvbpygfwmucldrhsnioate "
+	common_chars := "zqxjkvbpygfwmucldrhsnioate "
 
 	for _, char := range in {
 		
 		if is_valid_char(byte(char)) == false {
-			fmt.Println("Wrong score: ", in)
-			return -1
+			panic("Key should only produce valid characters!")
 		}
 
-		for worth, comm := range common_chars {
-			if char == comm || byte(char) == byte(comm) - 22 {
-				sc += worth
+		worth := strings.Index(common_chars, string(char))
+		if worth >= 0 {
+			sc += (worth + 1) * 12 // otherwise z would be worth 0
+		} else {
+			matched, _ := regexp.MatchString(`[A-Z0-9,.:!?]`, string(char))
+			if matched {
+				sc += 5
 			}
 		}
+	}
+
+	// do some more regex scoring
+	matched := english_word_regex.FindAllString(in, -1)
+	if len(matched) > 0	{
+//		fmt.Println(matched)
+//		fmt.Println(in)
+		sc += 1000 * len(matched)
 	}
 
 	return sc
 }
 
 func score_text(text string, key string) (int, string) {
-	fmt.Println("Decrypting with key ", key, " text: ", text)
+//	fmt.Println("Decrypting with key ", key, " text: ", text)
 	decrypted := crypt(text, key)
 
-	fmt.Println("Decrypted")
+//	fmt.Println("Decrypted")
 	sc := score(decrypted)
 	return sc, decrypted
 }
@@ -160,6 +174,9 @@ func search_key_candidates(text string, key_size int) []string {
 				// only add if is a valid char
 				// we expect the key to be "readable"
 				if is_valid_char(byte(char)) {
+					if len(string(char)) != 1 {
+						panic("Char should be len 1!")
+					}
 					key_cand[i] += string(byte(char))
 				}
 			}
@@ -171,7 +188,7 @@ func search_key_candidates(text string, key_size int) []string {
 
 func comb(in []string) string {
 
-	results := ""
+	var results strings.Builder
 	for j := 0; j < len(in[0]); j++ {
 		tmp := string(in[0][j]) 
 			
@@ -179,72 +196,73 @@ func comb(in []string) string {
 			tmp += comb(in[1:])
 		}
 
-		results += tmp + string(key_gen_sep)
+		results.WriteString(tmp + string(key_gen_sep))
 	}
 
-	return results
+	return results.String()
 }
 
 func generate(data []string) []string {
+	expected := 1
+	for i := 0; i < len(data); i++ {
+		expected *= len(data[i])
+	}
+
 	in := comb(data)
 
 	split := strings.Split(in, string(key_gen_sep))
 
-//	fmt.Println(split)
+	fmt.Printf("Generating %d key combinations!\n", expected)
+//	fmt.Println("Split: ", split)
 
-	//is_group := false
 	group_len := len(split[0])
-//	fmt.Println(len(split[0]))
 	group := split[0]
-	result := ""
+	var result strings.Builder
 	for i := 0; i < len(split); i++ {
-		if strings.Contains(split[i], string(key_gen_sep)) || len(split[i]) == 0 {
+//		if len(split[i]) == 0 || strings.Contains(split[i], string(key_gen_sep)) {
+		split_len := len(split[i])
+		if split_len == 0 {
 			continue
 		}
 //		fmt.Println("Split: ", split[i])
-		if len(split[i]) == group_len {
+		if split_len == group_len {
 			group = split[i]
 //			fmt.Println(group)
-			result += group + " "
+			result.WriteString(group + string(key_gen_sep))
 			continue
 		}
 		
-		ngroup_len := len(split[i])
-		group = group[0:group_len - ngroup_len] + split[i] 
+		group = group[0:group_len - split_len] + split[i] 
 //		fmt.Println("Next: ", group)
 
-		result += group + " "
-
+		result.WriteString(group + string(key_gen_sep))
 	}
 
-	result = result[:len(result) - 1]
+	ret := strings.Split(result.String(), string(key_gen_sep))
+	ret = ret[:len(ret) - 1]
 
-	return strings.Split(result, " ")
+	if len(ret) != expected {
+		panic("Key generator broken - not expected number of keys!")
+	}
+
+	return ret
 }
 
-func crack_key(text string, key_size int) (int, string) {
+func crack_key(text string, key_size int) (int, string, string) {
 	var key string
 
 	key_cand := search_key_candidates(text, key_size)
 	for cand := range key_cand {
 		fmt.Printf("Candidates #%d: '%s'\n", cand, key_cand[cand])
 	}
-	// key_cand looks like:
-	// "HELLO"
-	// "YOU"
-	// "THERE"
-	// -> possible keys: HYT, HYH, HYE, ... EYT, EYH, etc...
 
-	// "H"
-	// "IX"
-	// "ABC"
-
-	// 
+	// For debugging
 	//key_cand = make([]string, 3)
-	//key_cand[0] = "ABl"
-	//key_cand[1] = "oX"
-	//key_cand[2] = "ol"
+	//key_cand[0] = "lo"
+	//key_cand[1] = "ol"
+	//key_cand[2] = "lo"
 
+//	fmt.Println("Generating key combinations...")
 	keys_arr := generate(key_cand)
 
 	fmt.Printf("Possible keys (%d): %s\n", len(keys_arr), keys_arr)
@@ -254,21 +272,54 @@ func crack_key(text string, key_size int) (int, string) {
 	for i := 0; i < len(keys_arr); i++ {
 		pos_key := keys_arr[i]
 
-		fmt.Println("Scoring...")
+		if len(pos_key) != key_size {
+			panic("Size of possible key does not match key_size")
+		}
+
+//		fmt.Printf("Scoring with key: '%s'\n", pos_key)
 		sc, decr := score_text(text, pos_key)
-		fmt.Println("Text scored: ", decr)
+//		fmt.Printf("Text scored (%d) with key '%s': '%s'\n", sc, pos_key, decr)
 		if sc > high_score {
 			high_score = sc
 			high_score_text = decr
 			key = pos_key
-			fmt.Printf("Key: %s Score: %d => %s\n", pos_key, high_score, high_score_text)
+			fmt.Printf("Key: '%s' Score: %d => %s\n", pos_key, high_score, high_score_text)
 		}
 	}
 
-	return high_score, key
+	return high_score, key, high_score_text
+}
+
+func load_english_dict() {
+
+	fmt.Println("Loading most commong english words into RAM...")
+	file, _ := os.Open("engl_words.txt")
+	defer file.Close()
+
+	var str strings.Builder
+	str.WriteString(`(^|\s)(`)
+	scanner := bufio.NewScanner(file)
+
+	first := true
+	for scanner.Scan() {
+		common_english_words = append(common_english_words, []string{scanner.Text()}...)
+		if first == false {
+			str.WriteString("|")
+		}
+		first = false
+		str.WriteString(scanner.Text())
+	}
+
+	str.WriteString(`)($|\s)`)
+	fmt.Println("Regexp = ", str.String())
+	fmt.Println(common_english_words)
+	english_word_regex, _ = regexp.Compile(str.String())
 }
 
 func main() {
+
+	load_english_dict()
+
 	test  := "this is a test"
 	wokka := "wokka wokka!!!"
 	expected_diff := 37
@@ -301,25 +352,17 @@ func main() {
 		text += scanner.Text()
 	}
 
-	// ACTIVATE LATER
 	enc, _ := b64.StdEncoding.DecodeString(text)
 	decoded := string(enc)
 
-	if decoded == text {
-		fmt.Println("LOL")
-	}
+	// For debugging
+	decoded = encrypted_test
 
-//	key_size := detect_key_size(decoded, 2, 40)
-
-//	fmt.Println("Keysize detected: ", key_size)
-
-//	crack_key(decoded, key_size)
-
-	key_sizes := detect_key_size(encrypted_test, 2, 40)
+	key_sizes := detect_key_size(decoded, 2, 40)
 	for i := 0; i < len(key_sizes); i++ {
 		fmt.Println("Checking for key size: ", key_sizes[i])
-		key_score, key := crack_key(encrypted_test, key_sizes[i])
+		key_score, key, decr := crack_key(decoded, key_sizes[i])
 
-		fmt.Printf("Found key: '%s' with score: %d\n", key, key_score)
+		fmt.Printf("Found key: '%s' with score: %d -> '%s'\n", key, key_score, decr)
 	}
 }
