@@ -41,8 +41,10 @@ func detect_key_size(text string, min int, max int) []int {
 		edit_distance := calc_diff(first_slice, second_slice)
 		normalized := edit_distance / possible
 		fmt.Printf("d: %d, n: %d, key_size: %d\n", edit_distance, normalized, possible)
-		if (normalized <= best_score) {
+		if (normalized < best_score) {
 			best_score = normalized
+			res = []int{ possible }
+		} else if (normalized == best_score) {
 			res = append(res, []int{ possible }...)
 		}
 	}
@@ -56,6 +58,8 @@ func is_valid_char(in byte) bool {
 		if len(string(in)) == 0 {
 			panic("Not a valid char!")
 		}
+		return true
+	} else if in == '\n' {
 		return true
 	}
 	return false
@@ -253,6 +257,9 @@ func crack_key(text string, key_size int) (int, string, string) {
 
 	key_cand := search_key_candidates(text, key_size)
 	for cand := range key_cand {
+		if len(key_cand[cand]) == 0 {
+			panic("Could not determine any key candidates!")
+		}
 		fmt.Printf("Candidates #%d: '%s'\n", cand, key_cand[cand])
 	}
 
@@ -356,7 +363,7 @@ func main() {
 	decoded := string(enc)
 
 	// For debugging
-	decoded = encrypted_test
+//	decoded = encrypted_test
 
 	key_sizes := detect_key_size(decoded, 2, 40)
 	for i := 0; i < len(key_sizes); i++ {
