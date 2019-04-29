@@ -356,12 +356,19 @@ func main() {
 	}
 
 
+	test_key := "lol"
 	input_test := "hello, my dear friend!"
-	encrypted_test := crypt(input_test, "lol")
-	decrypted_test := crypt(encrypted_test, "lol")
+	encrypted_test := crypt(input_test, test_key)
+	decrypted_test := crypt(encrypted_test, test_key)
 
 	if input_test != decrypted_test {
 		panic("False crypt impl")
+	}
+
+	_, test_key_res, _, _ := crack_key(encrypted_test, len(test_key)) 
+
+	if test_key != test_key_res {
+		panic("Key cracker broken")
 	}
 
 	file, _ := os.Open("6.txt")
