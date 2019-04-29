@@ -7,6 +7,7 @@ import "bufio"
 import b64 "encoding/base64"
 import "strings"
 import "regexp"
+import "errors"
 
 var key_gen_sep byte = 1
 var common_english_words []string 
@@ -31,20 +32,33 @@ func detect_key_size(text string, min int, max int) []int {
 		if (possible * 2 > len(text)) {
 			break
 		}
-		first_slice := text[:possible]
-		second_slice := text[possible:possible * 2]
-		if len(first_slice) != possible || len(second_slice) != possible {
-			panic("Wrong code")
-		}
-		//slice = text[possible * 2:]
 
-		edit_distance := calc_diff(first_slice, second_slice)
-		normalized := edit_distance / possible
-		fmt.Printf("d: %d, n: %d, key_size: %d\n", edit_distance, normalized, possible)
-		if (normalized < best_score) {
-			best_score = normalized
+		samples := 0
+		score_sum := 0
+
+		for i := 0; i + (possible*2) < len(text); i+= possible {
+
+			first_slice := text[i:i+possible]
+			second_slice := text[i+possible:i+(possible * 2)]
+			if len(first_slice) != possible || len(second_slice) != possible {
+				panic("Wrong code")
+			}
+			//slice = text[possible * 2:]
+
+			edit_distance := calc_diff(first_slice, second_slice)
+			normalized := edit_distance / possible
+			
+			samples += 1
+			score_sum += normalized
+		}
+
+		score := score_sum / samples
+		fmt.Printf("key_len: %d (samples: %d; avg: %d)\n", possible, samples, score)
+
+		if (score < best_score) {
+			best_score = score
 			res = []int{ possible }
-		} else if (normalized == best_score) {
+		} else if (score == best_score) {
 			res = append(res, []int{ possible }...)
 		}
 	}
@@ -252,13 +266,15 @@ func generate(data []string) []string {
 	return ret
 }
 
-func crack_key(text string, key_size int) (int, string, string) {
+func crack_key(text string, key_size int) (int, string, string, error) {
 	var key string
 
 	key_cand := search_key_candidates(text, key_size)
 	for cand := range key_cand {
 		if len(key_cand[cand]) == 0 {
-			panic("Could not determine any key candidates!")
+			fmt.Println("No key candidates found!")
+			return 0, "", "", errors.New("No key available")
+//			panic("Could not determine any key candidates!")
 		}
 		fmt.Printf("Candidates #%d: '%s'\n", cand, key_cand[cand])
 	}
@@ -294,7 +310,7 @@ func crack_key(text string, key_size int) (int, string, string) {
 		}
 	}
 
-	return high_score, key, high_score_text
+	return high_score, key, high_score_text, nil
 }
 
 func load_english_dict() {
@@ -366,10 +382,22 @@ func main() {
 //	decoded = encrypted_test
 
 	key_sizes := detect_key_size(decoded, 2, 40)
+	high_score := 0
+	var winner_key string
 	for i := 0; i < len(key_sizes); i++ {
 		fmt.Println("Checking for key size: ", key_sizes[i])
-		key_score, key, decr := crack_key(decoded, key_sizes[i])
+		key_score, key, decr, err := crack_key(decoded, key_sizes[i])
 
-		fmt.Printf("Found key: '%s' with score: %d -> '%s'\n", key, key_score, decr)
+		if err != nil {
+			continue
+		}
+
+		if key_score > high_score {
+			winner_key = key
+			high_score = key_score
+			fmt.Printf("Next best key: '%s' with score: %d -> '%s'\n", key, key_score, decr)
+		}
 	}
+
+	fmt.Println("Winner key: ", winner_key)
 }
