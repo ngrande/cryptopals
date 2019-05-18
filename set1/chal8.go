@@ -22,22 +22,45 @@ func decrypt_block(line, key []byte) []byte {
 }
 
 // strategy:
-// applying a key that only differs int he last byte
-// shall produce the same result except for the last byte
-// but this only applies for ECB -> this way we detect it!
+// without knowing the key:
+// the input is 160 characters
+// we will just use a random 16 byte long key
+// and apply it to each block (of the same size)
+// to the whole line (160 byte) and look for the
+// line with the most repetitions!
 
-func detect_ecb(line []byte) bool {
-	KEY_1 := "YELLOW SUBMARINE"
-	KEY_2 := "YELLOW SUBMARINO"
+// TODO
+// next step:
+// crack the key:
+// * try to detect the key len
+// * find all key combinations which
+// produce only ASCII chars as output
 
-	res_1 := decrypt_block(line, []byte(KEY_1))
-	res_2 := decrypt_block(line, []byte(KEY_2))
+func detect_ecb(line []byte) int {
+	KEY := "YELLOW SUBMARINE"
 
-	if string(res_1)[:len(res_1)-1] == string(res_2)[:len(res_2)-1] {
-		return true
+	// block size = bs
+	bs := len(KEY)
+
+	// map with counter of occurences per block decipher
+	var occur map[string]int
+	occur = make(map[string]int)
+	for begin, end := 0, bs; begin < len(line); begin, end = begin+bs, end+bs {
+		res := decrypt_block(line[begin:end], []byte(KEY))
+		k := string(res)
+		count, _ := occur[k]
+		count += 1
+		occur[k] = count
 	}
 
-	return false
+	score := 0
+	for _, v := range(occur) {
+		if v > score {
+			score = v
+		}
+	}
+
+	return score
 }
 
 func main() {
@@ -50,6 +73,7 @@ func main() {
 	scanner := bufio.NewScanner(file)
 //	var buf strings.Builder
 
+	high_score := 0
 	for scanner.Scan() {
 //		buf.WriteString(scanner.Text())
 		decoded, err := hex.DecodeString(scanner.Text())
@@ -57,10 +81,12 @@ func main() {
 			panic(err)
 		}
 
-		is_ecb := detect_ecb(decoded)
+		score := detect_ecb(decoded)
 
-		if is_ecb {
+		if score > high_score {
+			fmt.Println("Score:", score)
 			fmt.Println("Result:", string(decoded))
+			high_score = score
 		}
 	}
 }

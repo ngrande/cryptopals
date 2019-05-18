@@ -13,6 +13,7 @@ var key_gen_sep byte = 1
 var common_english_words []string 
 var english_word_regex *regexp.Regexp
 
+// hamming distance
 func calc_diff(left string, right string) int {
 	diff := 0
 
