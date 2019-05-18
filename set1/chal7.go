@@ -9,6 +9,13 @@ import (
 	"crypto/aes"
 )
 
+// Some links:
+// why not to use ECB:
+// https://crypto.stackexchange.com/questions/20941/why-shouldnt-i-use-ecb-encryption/20946#20946
+// 
+// How ECB works:
+// https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Electronic_Codebook_.28ECB.29
+
 // to be honest i copied this pasta from SO:
 // Credits: https://stackoverflow.com/questions/24072026/golang-aes-ecb-encryption
 func decrypt_aes_128_ecb(data []byte, key []byte) []byte {
