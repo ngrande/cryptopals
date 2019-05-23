@@ -12,3 +12,7 @@ i use these challenges to tinker with Go, expect the code to be non go best prac
 * Challenge 5 [Go](set1/chal5.go)
 * Challenge 6 [Go](set1/chal6.go)
 * Challenge 7 [Go](set1/chal7.go)
+* Challenge 8 [Go](set1/chal8.go)
+
+## Set 2
+* Challenge 9 [Go](set2/chal9.go)
