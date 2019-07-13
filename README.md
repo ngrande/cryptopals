@@ -16,3 +16,4 @@ i use these challenges to tinker with Go, expect the code to be non go best prac
 
 ## Set 2
 * Challenge 9 [Go](set2/chal9.go)
+* Challenge 10 [Go](set2/chal10.go)
